@@ -112,7 +112,10 @@ class EfsMountTargetManager:
         return response
 
     def create_mount_target(self, filesystem_id, subnet_id, security_group_ids, ip_address=None):
-        response = self.efs.create_mount_target(FileSystemId=filesystem_id, SubnetId=subnet_id, IpAddress=ip_address, SecurityGroups=security_group_ids)
+        if ip_address:
+            response = self.efs.create_mount_target(FileSystemId=filesystem_id, SubnetId=subnet_id, SecurityGroups=security_group_ids, IpAddress=ip_address)
+        else:
+            response = self.efs.create_mount_target(FileSystemId=filesystem_id, SubnetId=subnet_id, SecurityGroups=security_group_ids)
         return response
 
 def main():
@@ -122,7 +125,7 @@ def main():
         mount_target_id={'required': False, 'type': 'str'},
         filesystem_id={'required': False, 'type': 'str'},
         subnet_id={'required': False, 'type':'str'},
-        ip_address={'required': False, 'type': 'str' },
+        ip_address={'required': False },
         security_group_ids={'required': False, 'type': 'list' },
         state={'default':'present', 'required': False, 'choices': ['present', 'absent'] },
     ))
@@ -151,7 +154,7 @@ def main():
 
     elif module.params['state'] == 'present':
         try:
-            results['efs_mount_target'] = efs_target_manager.create_mount_target(filesystem_id=module.params['filesystem_id'], subnet_id=module.params['subnet_id'], security_group_ids=module.params['security_group_ids'])
+            results['efs_mount_target'] = efs_target_manager.create_mount_target(filesystem_id=module.params['filesystem_id'], subnet_id=module.params['subnet_id'], security_group_ids=module.params['security_group_ids'], ip_address=module.params['ip_address'])
             results['changed'] = True
         except Exception, e:
             module.fail_json(msg="Exception creating EFS mount target: "+str(e))
