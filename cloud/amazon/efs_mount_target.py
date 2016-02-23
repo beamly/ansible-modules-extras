@@ -147,14 +147,14 @@ def main():
         try:
             results = efs_target_manager.delete_efs_mount_target(mount_target_id=module.params['mount_target_id'])
         except Exception, e:
-            module.fail_json(msg="Exception finding EFS mount target '"+module.params['name']+"': "+str(e))
+            module.fail_json(msg="Exception finding EFS mount target '"+module.params['mount_target_id']+"': "+str(e))
 
     elif module.params['state'] == 'present':
         try:
             results['efs_mount_target'] = efs_target_manager.create_mount_target(filesystem_id=module.params['filesystem_id'], subnet_id=module.params['subnet_id'], security_group_ids=module.params['security_group_ids'])
             results['changed'] = True
         except Exception, e:
-            module.fail_json(msg="Exception creating EFS mount target '"+module.params['name']+"': "+str(e))
+            module.fail_json(msg="Exception creating EFS mount target: "+str(e))
 
     module.exit_json(**results)
 
