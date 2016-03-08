@@ -93,7 +93,14 @@ EXAMPLES = '''
     tags:
       example: tag1
       another: tag2
-    
+
+# Create a bucket, add a policy from a template. Note the single space after the Jinja brackets - This prevents ansible core converting this in to a dict.
+- s3_bucket:
+    name: mys3bucket
+    policy: "{{ lookup('template','policy.json.j2', convert_data=False) }} "
+
+
+
 '''
 
 import xml.etree.ElementTree as ET
@@ -108,12 +115,12 @@ except ImportError:
     HAS_BOTO = False
 
 def get_request_payment_status(bucket):
-    
+
     response = bucket.get_request_payment()
     root = ET.fromstring(response)
     for message in root.findall('.//{http://s3.amazonaws.com/doc/2006-03-01/}Payer'):
         payer = message.text
-    
+
     if payer == "BucketOwner":
         return False
     else:
@@ -130,14 +137,14 @@ def create_tags_container(tags):
     return tags_obj
 
 def create_bucket(connection, module, location):
-    
+
     policy = module.params.get("policy")
     name = module.params.get("name")
     requester_pays = module.params.get("requester_pays")
     tags = module.params.get("tags")
     versioning = module.params.get("versioning")
     changed = False
-    
+
     try:
         bucket = connection.get_bucket(name)
     except S3ResponseError, e:
@@ -146,7 +153,7 @@ def create_bucket(connection, module, location):
             changed = True
         except S3CreateError, e:
             module.fail_json(msg=e.message)
-    
+
     # Versioning
     versioning_status = bucket.get_versioning_status()
     if not versioning_status and versioning:
@@ -168,7 +175,7 @@ def create_bucket(connection, module, location):
             bucket.configure_versioning(versioning)
             changed = True
             versioning_status = bucket.get_versioning_status()
-    
+
     # Requester pays
     requester_pays_status = get_request_payment_status(bucket)
     if requester_pays_status != requester_pays:
@@ -181,7 +188,7 @@ def create_bucket(connection, module, location):
             changed = True
             requester_pays_status = get_request_payment_status(bucket)
 
-    # Policy        
+    # Policy
     try:
         current_policy = bucket.get_policy()
     except S3ResponseError, e:
@@ -189,11 +196,9 @@ def create_bucket(connection, module, location):
             current_policy = None
         else:
             module.fail_json(msg=e.message)
-    
+
     if current_policy is not None and policy is not None:
-        if policy is not None:
-            policy = json.dumps(policy)
-            
+
         if json.loads(current_policy) != json.loads(policy):
             try:
                 bucket.set_policy(policy)
@@ -204,14 +209,14 @@ def create_bucket(connection, module, location):
 
     elif current_policy is None and policy is not None:
         policy = json.dumps(policy)
-            
+
         try:
             bucket.set_policy(policy)
             changed = True
             current_policy = bucket.get_policy()
         except S3ResponseError, e:
             module.fail_json(msg=e.message)
-    
+
     elif current_policy is not None and policy is None:
         try:
             bucket.delete_policy()
@@ -222,11 +227,11 @@ def create_bucket(connection, module, location):
                 current_policy = None
             else:
                 module.fail_json(msg=e.message)
-            
+
     ####
     ## Fix up json of policy so it's not escaped
     ####
-    
+
     # Tags
     try:
         current_tags = bucket.get_tags()
@@ -236,9 +241,9 @@ def create_bucket(connection, module, location):
             current_tags = None
         else:
             module.fail_json(msg=e.message)
-    
+
     if current_tags is not None or tags is not None:
-       
+
         if current_tags is None:
             current_tags_dict = {}
         else:
@@ -256,13 +261,13 @@ def create_bucket(connection, module, location):
                 module.fail_json(msg=e.message)
 
     module.exit_json(changed=changed, name=bucket.name, versioning=versioning_status, requester_pays=requester_pays_status, policy=current_policy, tags=current_tags_dict)
-    
+
 def destroy_bucket(connection, module):
-    
+
     force = module.params.get("force")
     name = module.params.get("name")
     changed = False
-    
+
     try:
         bucket = connection.get_bucket(name)
     except S3ResponseError, e:
@@ -271,22 +276,22 @@ def destroy_bucket(connection, module):
         else:
             # Bucket already absent
             module.exit_json(changed=changed)
-    
+
     if force:
         try:
             # Empty the bucket
             for key in bucket.list():
                 key.delete()
-                
+
         except BotoServerError, e:
             module.fail_json(msg=e.message)
-    
+
     try:
         bucket = connection.delete_bucket(name)
         changed = True
     except S3ResponseError, e:
         module.fail_json(msg=e.message)
-        
+
     module.exit_json(changed=changed)
 
 def is_fakes3(s3_url):
@@ -307,26 +312,26 @@ def is_walrus(s3_url):
         return False
 
 def main():
-    
+
     argument_spec = ec2_argument_spec()
     argument_spec.update(
         dict(
             force = dict(required=False, default='no', type='bool'),
-            policy = dict(required=False, default=None),
-            name = dict(required=True),
+            policy = dict(required=False, type='str', default=None),
+            name = dict(required=True, type='str'),
             requester_pays = dict(default='no', type='bool'),
-            s3_url = dict(aliases=['S3_URL']),
-            state = dict(default='present', choices=['present', 'absent']),
+            s3_url = dict(aliases=['S3_URL'], type='str'),
+            state = dict(default='present', type='str', choices=['present', 'absent']),
             tags = dict(required=None, default={}, type='dict'),
             versioning = dict(default='no', type='bool')
         )
     )
-    
+
     module = AnsibleModule(argument_spec=argument_spec)
 
     if not HAS_BOTO:
         module.fail_json(msg='boto required for this module')
-    
+
     region, ec2_url, aws_connect_params = get_aws_connection_info(module)
 
     if region in ('us-east-1', '', None):
