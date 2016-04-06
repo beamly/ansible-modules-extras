@@ -208,8 +208,6 @@ def create_bucket(connection, module, location):
                 module.fail_json(msg=e.message)
 
     elif current_policy is None and policy is not None:
-        policy = json.dumps(policy)
-
         try:
             bucket.set_policy(policy)
             changed = True
